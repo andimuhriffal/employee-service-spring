@@ -1,13 +1,13 @@
 pipeline {
-    agent any
+    agent { label 'agent-node1' }
 
-    environment {
-        SONARQUBE_SERVER = 'MySonarQube' // nama credential SonarQube di Jenkins
-        JAVA_HOME = '/usr/lib/jvm/java-17-openjdk-amd64'
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '5'))
     }
 
-    tools {
-        maven 'Maven 3.8' // sesuaikan dengan nama Maven yang di-setup di Jenkins
+    environment {
+        // Menyediakan token login dari credential Jenkins jika perlu
+        SONAR_LOGIN = credentials('sonarqube-token') // Opsional jika tidak pakai token
     }
 
     stages {
@@ -17,22 +17,18 @@ pipeline {
             }
         }
 
-        stage('Build All Services') {
+        stage('SonarQube Scan') {
             steps {
-                sh 'mvn clean install -DskipTests'
-            }
-        }
-
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv("${SONARQUBE_SERVER}") {
-                    sh """
-                    mvn sonar:sonar \
-                        -Dsonar.projectKey=employee-service \
-                        -Dsonar.projectName=Employee Service \
-                        -Dsonar.host.url=$SONAR_HOST_URL \
-                        -Dsonar.login=$SONAR_AUTH_TOKEN
-                    """
+                withSonarQubeEnv(installationName: 'sq1') {
+                    sh 'chmod +x ./mvnw'
+                    sh '''
+                        ./mvnw clean verify \
+                        org.sonarsource.scanner.maven:sonar-maven-plugin:3.9.0.2155:sonar \
+                        -DskipTests \
+                        -Dsonar.projectKey=employee-service-spring \
+                        -Dsonar.projectName="Employee Service" \
+                        -Dsonar.login=$SONAR_LOGIN
+                    '''
                 }
             }
         }
